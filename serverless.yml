@@ -1,0 +1,59 @@
+service: ignitecertificate3
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: dev
+  region: us-east-1
+
+plugins:
+  - serverless-esbuild
+  - serverless-dynamodb-local
+  - serverless-iam-roles-per-function
+  - serverless-offline
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+  dynamodb:
+    stages:
+      - dev
+      - local
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+
+functions:
+  generateCertificate:
+    handler: ./src/functions/generate-certificate.handler
+    name: generate-certificate
+    memorySize: 128 # mb
+    timeout: 5 # seconds
+    events:
+      - http:
+          path: generateCertificate
+          method: POST
+    iamRoleStatements:
+      - Effect: 'Allow'
+        Action:
+          - 'dynamodb:PutItem'
+          - 'dynamodb:GetItem'
+        Resource: !GetAtt dbCertificateUsers.Arn
+
+resources:
+  Resources:
+    dbCertificateUsers:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: users_certificate
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
